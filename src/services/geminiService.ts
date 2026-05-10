@@ -1,6 +1,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) {
+  console.warn("GEMINI_API_KEY is not defined. Please configure it in your environment variables.");
+}
+
+const genAI = apiKey ? new GoogleGenAI({ apiKey }) : null;
+const ai = genAI; 
 
 export interface VibeResult {
   title: string;
@@ -169,6 +175,10 @@ export async function analyzeVibe(name: string): Promise<VibeResult> {
   Also categorize them into one of these: lazy, foodie, gamer, drama, genius, clumsy, party, rich, overthinker, sleepy, savage, broke, flexer, emotional, gym_rat.
   
   RNG Seed for variety: ${Math.random()}`;
+
+  if (!ai) {
+    throw new Error("AI service not initialized. Please ensure GEMINI_API_KEY is configured.");
+  }
 
   const response = await ai.models.generateContent({
     model,
