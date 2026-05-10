@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toPng } from 'html-to-image';
 import { 
   Scan, 
   User, 
@@ -13,7 +14,8 @@ import {
   Search,
   Dna,
   ShieldAlert,
-  Ghost
+  Ghost,
+  Download
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { analyzeVibe, VibeResult } from './services/geminiService';
@@ -48,7 +50,9 @@ export default function App() {
   const [scanMessageIndex, setScanMessageIndex] = useState(0);
   const [result, setResult] = useState<VibeResult | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const audioCtx = useRef<AudioContext | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const playSound = (type: 'scan' | 'success' | 'alert' | 'glitch' | 'divine') => {
     if (!audioCtx.current) {
@@ -325,7 +329,7 @@ export default function App() {
             animate={{ opacity: 1, y: 0, rotateX: 0 }}
             className="w-full max-w-md perspective-[1000px] relative"
           >
-            <div className="glass-card badge-glow p-1 border border-white/10 shadow-2xl relative overflow-hidden rounded-[32px]">
+            <div ref={cardRef} className="glass-card badge-glow p-1 border border-white/10 shadow-2xl relative overflow-hidden rounded-[32px]">
               {/* Color Aura */}
               <motion.div 
                 animate={{ 
@@ -376,6 +380,7 @@ export default function App() {
                       alt="Funny Vibe"
                       className={`w-full h-full object-cover grayscale-0 group-hover:scale-105 transition-all duration-700 relative z-10 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                       referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
                       onLoad={() => setImageLoaded(true)}
                     />
                   </motion.div>
@@ -479,19 +484,59 @@ export default function App() {
                 </button>
                 <button
                   id="share-button"
-                  onClick={() => {
-                    const text = `Vibe Inspector က စစ်ဆေးလိုက်တဲ့ ${name} ရဲ့ ရလဒ်ကတော့ "${result.title}" တဲ့! စစ်ကြည့်ချင်ရင် ဒီမှာနှိပ်: ${window.location.href}`;
-                    if (navigator.share) {
-                      navigator.share({ title: 'Vibe Result', text, url: window.location.href });
-                    } else {
+                  disabled={isSharing}
+                  onClick={async () => {
+                    if (!cardRef.current || !result) return;
+                    setIsSharing(true);
+                    try {
+                      const dataUrl = await toPng(cardRef.current, {
+                        cacheBust: true,
+                        backgroundColor: '#09090b',
+                        pixelRatio: 2,
+                        style: {
+                          transform: 'scale(1)',
+                        }
+                      });
+
+                      const blob = await (await fetch(dataUrl)).blob();
+                      const file = new File([blob], `${name}-vibe.png`, { type: 'image/png' });
+
+                      const shareText = `Vibe Inspector က စစ်ဆေးလိုက်တဲ့ ${name} ရဲ့ ရလဒ်ကတော့ "${result.title}" တဲ့! စစ်ကြည့်ချင်ရင် ဒီမှာနှိပ်: ${window.location.href}`;
+
+                      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                          title: 'My Vibe Result',
+                          text: shareText,
+                          files: [file],
+                        });
+                      } else {
+                        // Fallback for desktop: download and copy text
+                        const link = document.createElement('a');
+                        link.download = `${name}-vibe-result.png`;
+                        link.href = dataUrl;
+                        link.click();
+                        
+                        await navigator.clipboard.writeText(shareText);
+                        alert('ရလဒ်ပုံရိပ်ကို Download ရယူပြီးပါပြီ! Link ကိုတော့ Clipboard မှာ သိမ်းထားပေးပါတယ်။ သူငယ်ချင်းတွေဆီ Share လိုက်ပါဦး!');
+                      }
+                    } catch (err) {
+                      console.error('Sharing failed', err);
+                      // Final fallback
+                      const text = `Vibe Inspector က စစ်ဆေးလိုက်တဲ့ ${name} ရဲ့ ရလဒ်ကတော့ "${result.title}" တဲ့! စစ်ကြည့်ချင်ရင် ဒီမှာနှိပ်: ${window.location.href}`;
                       navigator.clipboard.writeText(text);
-                      alert('Copied to clipboard! Share it with your friend!');
+                      alert('Sharing failed. Title copied to clipboard!');
+                    } finally {
+                      setIsSharing(false);
                     }
                   }}
-                  className="bg-white text-black font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 hover:bg-zinc-200"
+                  className="bg-white text-black font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 hover:bg-zinc-200 disabled:opacity-50"
                 >
-                  <Share2 className="w-4 h-4" />
-                  စနောက်ကြမယ်
+                  {isSharing ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Share2 className="w-4 h-4" />
+                  )}
+                  {isSharing ? 'စစ်ဆေးနေဆဲ...' : 'စနောက်ကြမယ်'}
                 </button>
               </div>
             </div>
