@@ -59,13 +59,24 @@ export default function App() {
       audioCtx.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
     const ctx = audioCtx.current;
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
     const now = ctx.currentTime;
 
     const createOsc = (freq: number, oscType: OscillatorType, startTime: number, duration: number, vol: number, sweepFreq?: number) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.connect(gain);
+      const filter = ctx.createBiquadFilter();
+      
+      osc.connect(filter);
+      filter.connect(gain);
       gain.connect(ctx.destination);
+      
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(freq * 2, startTime);
+      filter.frequency.exponentialRampToValueAtTime(freq * 1.2, startTime + duration);
+
       osc.type = oscType;
       osc.frequency.setValueAtTime(freq, startTime);
       if (sweepFreq) {
@@ -491,8 +502,9 @@ export default function App() {
                     try {
                       const dataUrl = await toPng(cardRef.current, {
                         cacheBust: true,
-                        backgroundColor: '#09090b',
+                        backgroundColor: '#050505',
                         pixelRatio: 2,
+                        quality: 0.95,
                         style: {
                           transform: 'scale(1)',
                         }
@@ -529,14 +541,14 @@ export default function App() {
                       setIsSharing(false);
                     }
                   }}
-                  className="bg-white text-black font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 hover:bg-zinc-200 disabled:opacity-50"
+                  className="bg-white text-black font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 hover:bg-zinc-200 disabled:opacity-50 active:scale-95"
                 >
                   {isSharing ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
                   ) : (
-                    <Share2 className="w-4 h-4" />
+                    <Download className="w-4 h-4" />
                   )}
-                  {isSharing ? 'စစ်ဆေးနေဆဲ...' : 'စနောက်ကြမယ်'}
+                  {isSharing ? 'ပုံထုတ်နေဆဲ...' : 'ရလဒ်ပုံသိမ်းမယ်'}
                 </button>
               </div>
             </div>
